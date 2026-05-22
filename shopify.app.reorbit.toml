@@ -1,0 +1,22 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "9fd36610c7629f132d5ee32c6eb9ae29"
+application_url = "https://reorbit.dev"
+embedded = true
+name = "Reorbit"
+
+[webhooks]
+api_version = "2026-07"
+
+
+[webhooks.privacy_compliance]
+customer_deletion_url = "https://reorbit.dev/api/public/webhooks/shopify/compliance"
+customer_data_request_url = "https://reorbit.dev/api/public/webhooks/shopify/compliance"
+shop_deletion_url = "https://reorbit.dev/api/public/webhooks/shopify/compliance"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,read_orders,read_products,read_script_tags,write_script_tags"
+
+[auth]
+redirect_urls = [ "https://reorbit.dev/auth/shopify/callback" ]

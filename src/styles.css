@@ -1,0 +1,131 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap");
+
+@theme inline {
+  --font-display: "Space Grotesk", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-glow: var(--primary-glow);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+}
+
+:root {
+  --radius: 1rem;
+
+  /* Deep space palette */
+  --background: oklch(0.14 0.03 270);
+  --foreground: oklch(0.97 0.01 270);
+
+  --surface: oklch(0.18 0.035 270);
+  --surface-elevated: oklch(0.22 0.04 270);
+
+  --card: oklch(0.18 0.035 270);
+  --card-foreground: oklch(0.97 0.01 270);
+  --popover: oklch(0.22 0.04 270);
+  --popover-foreground: oklch(0.97 0.01 270);
+
+  /* Vibrant violet → cyan brand */
+  --primary: oklch(0.68 0.22 295);
+  --primary-foreground: oklch(0.14 0.03 270);
+  --primary-glow: oklch(0.78 0.18 220);
+
+  --secondary: oklch(0.28 0.05 270);
+  --secondary-foreground: oklch(0.97 0.01 270);
+
+  --muted: oklch(0.24 0.04 270);
+  --muted-foreground: oklch(0.68 0.03 270);
+
+  --accent: oklch(0.78 0.18 220);
+  --accent-foreground: oklch(0.14 0.03 270);
+
+  --destructive: oklch(0.65 0.24 20);
+  --destructive-foreground: oklch(0.97 0.01 270);
+
+  --border: oklch(0.28 0.04 270);
+  --input: oklch(0.24 0.04 270);
+  --ring: oklch(0.68 0.22 295);
+
+  --gradient-brand: linear-gradient(135deg, oklch(0.68 0.22 295), oklch(0.78 0.18 220));
+  --gradient-surface: linear-gradient(180deg, oklch(0.18 0.035 270), oklch(0.14 0.03 270));
+  --gradient-bubble: linear-gradient(135deg, oklch(0.68 0.22 295 / 0.9), oklch(0.78 0.18 220 / 0.9));
+  --shadow-glow: 0 8px 32px -8px oklch(0.68 0.22 295 / 0.4);
+  --shadow-bubble: 0 4px 20px -4px oklch(0 0 0 / 0.5);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--gradient-surface);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* Safe area for notch / home indicator */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+@layer utilities {
+  .bg-gradient-brand { background: var(--gradient-brand); }
+  .bg-gradient-bubble { background: var(--gradient-bubble); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
+  .shadow-bubble { box-shadow: var(--shadow-bubble); }
+  .text-gradient-brand {
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Pulsing typing dots */
+@keyframes typing-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40% { transform: scale(1); opacity: 1; }
+}
+.typing-dot {
+  animation: typing-bounce 1.4s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.16s; }
+.typing-dot:nth-child(3) { animation-delay: 0.32s; }

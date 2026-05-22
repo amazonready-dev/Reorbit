@@ -1,0 +1,34 @@
+# Shopify App configuration
+# https://shopify.dev/docs/apps/build/cli-for-apps/app-configuration
+
+name = "Reorbit"
+client_id = "REPLACE_WITH_SHOPIFY_API_KEY"
+application_url = "https://reorbit.dev"
+embedded = true
+
+[access_scopes]
+scopes = "read_orders,read_customers,read_products,read_script_tags,write_script_tags"
+
+[auth]
+redirect_urls = [
+  "https://reorbit.dev/auth/shopify/callback"
+]
+
+[webhooks]
+api_version = "2025-04"
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "https://reorbit.dev/api/public/webhooks/shopify/compliance"
+  customer_data_request_url = "https://reorbit.dev/api/public/webhooks/shopify/compliance"
+  shop_deletion_url = "https://reorbit.dev/api/public/webhooks/shopify/compliance"
+
+[app_proxy]
+url = "https://reorbit.dev"
+subpath = "reorbit"
+prefix = "apps"
+
+[pos]
+embedded = false
+
+[build]
+include_config_on_deploy = true
