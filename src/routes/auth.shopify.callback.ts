@@ -6,28 +6,30 @@ function isValidShopDomain(shop: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shop);
 }
 
-/**
- * Verifies Shopify OAuth callback HMAC per:
- * https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/authorization-code-grant
- */
 function verifyShopifyHmac(url: URL, secret: string): boolean {
   const params = new URLSearchParams(url.searchParams);
+
   const hmac = params.get("hmac");
   if (!hmac) return false;
+
   params.delete("hmac");
   params.delete("signature");
 
-  // Sort + urlencode in Shopify's exact format (RFC 3986-ish, & joined)
+  // Shopify requires exact sorted query string
   const sorted = [...params.entries()]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)
     .join("&");
 
   const computed = createHmac("sha256", secret).update(sorted).digest("hex");
-  const a = Buffer.from(hmac, "utf8");
-  const b = Buffer.from(computed, "utf8");
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+
+  // IMPORTANT FIX: compare hex properly (NOT utf8)
+  const hmacBuffer = Buffer.from(hmac, "hex");
+  const computedBuffer = Buffer.from(computed, "hex");
+
+  if (hmacBuffer.length !== computedBuffer.length) return false;
+
+  return timingSafeEqual(hmacBuffer, computedBuffer);
 }
 
 export const Route = createFileRoute("/auth/shopify/callback")({
@@ -35,6 +37,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
     handlers: {
       GET: async ({ request }) => {
         const url = new URL(request.url);
+
         const shop = url.searchParams.get("shop");
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
@@ -45,16 +48,17 @@ export const Route = createFileRoute("/auth/shopify/callback")({
 
         const apiKey = process.env.SHOPIFY_API_KEY;
         const apiSecret = process.env.SHOPIFY_API_SECRET;
+
         if (!apiKey || !apiSecret) {
-          return new Response("Shopify credentials not configured", { status: 500 });
+          return new Response("Missing Shopify env vars", { status: 500 });
         }
 
-        // 1. Verify HMAC signature
+        // 1. HMAC verification
         if (!verifyShopifyHmac(url, apiSecret)) {
           return new Response("HMAC verification failed", { status: 401 });
         }
 
-        // 2. Verify + consume state (CSRF)
+        // 2. CSRF state check
         const { data: stateRow, error: stateErr } = await supabaseAdmin
           .from("shopify_oauth_states")
           .select("state, shop_domain")
@@ -65,22 +69,28 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           return new Response("Invalid or expired state", { status: 401 });
         }
 
-        await supabaseAdmin.from("shopify_oauth_states").delete().eq("state", state);
+        await supabaseAdmin
+          .from("shopify_oauth_states")
+          .delete()
+          .eq("state", state);
 
-        // 3. Exchange code for access_token
-        const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            client_id: apiKey,
-            client_secret: apiSecret,
-            code,
-          }),
-        });
+        // 3. Exchange code for token
+        const tokenRes = await fetch(
+          `https://${shop}/admin/oauth/access_token`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              client_id: apiKey,
+              client_secret: apiSecret,
+              code,
+            }),
+          },
+        );
 
         if (!tokenRes.ok) {
           const text = await tokenRes.text();
-          console.error("Token exchange failed:", tokenRes.status, text);
+          console.error("Token exchange failed:", text);
           return new Response("Token exchange failed", { status: 502 });
         }
 
@@ -89,26 +99,28 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           scope: string;
         };
 
-        // 4. Fetch shop details (best-effort)
-        let shopInfo: {
-          name?: string;
-          email?: string;
-          plan_name?: string;
-          currency?: string;
-        } = {};
+        // 4. Fetch shop info (safe fallback)
+        let shopInfo: any = {};
+
         try {
-          const shopRes = await fetch(`https://${shop}/admin/api/2024-10/shop.json`, {
-            headers: { "X-Shopify-Access-Token": tokenJson.access_token },
-          });
+          const shopRes = await fetch(
+            `https://${shop}/admin/api/2024-10/shop.json`,
+            {
+              headers: {
+                "X-Shopify-Access-Token": tokenJson.access_token,
+              },
+            },
+          );
+
           if (shopRes.ok) {
-            const json = (await shopRes.json()) as { shop: typeof shopInfo };
+            const json = await shopRes.json();
             shopInfo = json.shop ?? {};
           }
         } catch (e) {
-          console.warn("Could not fetch shop info:", e);
+          console.warn("Shop fetch failed:", e);
         }
 
-        // 5. Upsert shop record
+        // 5. Save shop
         const { error: upsertErr } = await supabaseAdmin.from("shops").upsert(
           {
             shop_domain: shop,
@@ -125,40 +137,43 @@ export const Route = createFileRoute("/auth/shopify/callback")({
         );
 
         if (upsertErr) {
-          console.error("Failed to save shop:", upsertErr);
-          return new Response("Failed to save shop", { status: 500 });
+          console.error(upsertErr);
+          return new Response("DB error", { status: 500 });
         }
 
-        // 5b. Register webhooks (idempotent — Shopify dedupes by address+topic)
-        const webhookTopics: Array<{ topic: string; path: string }> = [
+        // 6. Register webhooks (safe, idempotent)
+        const webhookTopics = [
           { topic: "orders/create", path: "/api/public/webhooks/shopify/orders-create" },
           { topic: "app/uninstalled", path: "/api/public/webhooks/shopify/app-uninstalled" },
         ];
+
         for (const { topic, path } of webhookTopics) {
           try {
-            const hookRes = await fetch(`https://${shop}/admin/api/2024-10/webhooks.json`, {
+            await fetch(`https://${shop}/admin/api/2024-10/webhooks.json`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "X-Shopify-Access-Token": tokenJson.access_token,
               },
               body: JSON.stringify({
-                webhook: { topic, address: `${url.origin}${path}`, format: "json" },
+                webhook: {
+                  topic,
+                  address: `${url.origin}${path}`,
+                  format: "json",
+                },
               }),
             });
-            // 422 = already exists, that's fine
-            if (!hookRes.ok && hookRes.status !== 422) {
-              console.warn(`Webhook ${topic} registration failed:`, hookRes.status, await hookRes.text());
-            }
           } catch (e) {
-            console.warn(`Webhook ${topic} registration error:`, e);
+            console.warn("Webhook error:", topic, e);
           }
         }
 
-        // 6. Redirect to merchant app home (will become dashboard later)
+        // 7. Redirect to app
         return new Response(null, {
           status: 302,
-          headers: { Location: `/app?shop=${encodeURIComponent(shop)}` },
+          headers: {
+            Location: `/app?shop=${encodeURIComponent(shop)}`,
+          },
         });
       },
     },
