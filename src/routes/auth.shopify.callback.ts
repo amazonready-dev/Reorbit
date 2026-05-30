@@ -6,13 +6,8 @@ function isValidShopDomain(shop: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shop);
 }
 
-/**
- * ✅ FIXED Shopify HMAC verification (correct RAW query usage)
- */
 function verifyShopifyHmac(url: URL, secret: string): boolean {
-  const rawQuery = url.search; // 👈 IMPORTANT: RAW, not rebuilt
-
-  const params = new URLSearchParams(rawQuery);
+  const params = new URLSearchParams(url.searchParams);
 
   const hmac = params.get("hmac");
   if (!hmac) return false;
@@ -20,22 +15,22 @@ function verifyShopifyHmac(url: URL, secret: string): boolean {
   params.delete("hmac");
   params.delete("signature");
 
-  const message = [...params.entries()]
+  // Shopify requires exact alphabetical sorting
+  const sorted = [...params.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
+    .map(([k, v]) => `${k}=${v}`)
     .join("&");
 
-  const generatedHash = createHmac("sha256", secret)
-    .update(message)
+  const computed = createHmac("sha256", secret)
+    .update(sorted)
     .digest("hex");
 
-  // ✅ proper binary compare
   const hmacBuffer = Buffer.from(hmac, "hex");
-  const generatedBuffer = Buffer.from(generatedHash, "hex");
+  const computedBuffer = Buffer.from(computed, "hex");
 
-  if (hmacBuffer.length !== generatedBuffer.length) return false;
+  if (hmacBuffer.length !== computedBuffer.length) return false;
 
-  return timingSafeEqual(hmacBuffer, generatedBuffer);
+  return timingSafeEqual(hmacBuffer, computedBuffer);
 }
 
 export const Route = createFileRoute("/auth/shopify/callback")({
@@ -44,11 +39,17 @@ export const Route = createFileRoute("/auth/shopify/callback")({
       GET: async ({ request }) => {
         const url = new URL(request.url);
 
+        // 🔥 DEBUG (SVARBIAUSIAS DALYKAS)
+        console.log("🔵 CALLBACK URL:", request.url);
+        console.log("🔵 SHOPIFY_APP_URL:", process.env.SHOPIFY_APP_URL);
+        console.log("🔵 SEARCH PARAMS:", Object.fromEntries(url.searchParams));
+
         const shop = url.searchParams.get("shop");
         const code = url.searchParams.get("code");
         const state = url.searchParams.get("state");
 
         if (!shop || !code || !state || !isValidShopDomain(shop)) {
+          console.error("❌ Invalid callback params");
           return new Response("Invalid callback parameters", { status: 400 });
         }
 
@@ -56,11 +57,15 @@ export const Route = createFileRoute("/auth/shopify/callback")({
         const apiSecret = process.env.SHOPIFY_API_SECRET;
 
         if (!apiKey || !apiSecret) {
+          console.error("❌ Missing env vars");
           return new Response("Missing Shopify env vars", { status: 500 });
         }
 
-        // 1. HMAC check
-        if (!verifyShopifyHmac(url, apiSecret)) {
+        // 1. HMAC CHECK
+        const hmacValid = verifyShopifyHmac(url, apiSecret);
+
+        if (!hmacValid) {
+          console.error("❌ HMAC FAILED");
           return new Response("HMAC verification failed", { status: 401 });
         }
 
@@ -72,6 +77,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           .maybeSingle();
 
         if (stateErr || !stateRow || stateRow.shop_domain !== shop) {
+          console.error("❌ Invalid state");
           return new Response("Invalid or expired state", { status: 401 });
         }
 
@@ -80,7 +86,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           .delete()
           .eq("state", state);
 
-        // 3. Exchange code for access token
+        // 3. Exchange code for token
         const tokenRes = await fetch(
           `https://${shop}/admin/oauth/access_token`,
           {
@@ -96,7 +102,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
 
         if (!tokenRes.ok) {
           const text = await tokenRes.text();
-          console.error("Token exchange failed:", text);
+          console.error("❌ Token exchange failed:", text);
           return new Response("Token exchange failed", { status: 502 });
         }
 
@@ -105,7 +111,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           scope: string;
         };
 
-        // 4. Fetch shop info
+        // 4. Get shop info
         let shopInfo: any = {};
 
         try {
@@ -123,10 +129,10 @@ export const Route = createFileRoute("/auth/shopify/callback")({
             shopInfo = json.shop ?? {};
           }
         } catch (e) {
-          console.warn("Shop fetch failed:", e);
+          console.warn("⚠️ Shop fetch failed:", e);
         }
 
-        // 5. Save shop
+        // 5. Save to DB
         const { error: upsertErr } = await supabaseAdmin.from("shops").upsert(
           {
             shop_domain: shop,
@@ -143,17 +149,17 @@ export const Route = createFileRoute("/auth/shopify/callback")({
         );
 
         if (upsertErr) {
-          console.error(upsertErr);
+          console.error("❌ DB error:", upsertErr);
           return new Response("DB error", { status: 500 });
         }
 
         // 6. Webhooks
-        const webhookTopics = [
+        const webhooks = [
           { topic: "orders/create", path: "/api/public/webhooks/shopify/orders-create" },
           { topic: "app/uninstalled", path: "/api/public/webhooks/shopify/app-uninstalled" },
         ];
 
-        for (const { topic, path } of webhookTopics) {
+        for (const { topic, path } of webhooks) {
           try {
             await fetch(`https://${shop}/admin/api/2024-10/webhooks.json`, {
               method: "POST",
@@ -170,7 +176,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
               }),
             });
           } catch (e) {
-            console.warn("Webhook error:", topic, e);
+            console.warn("⚠️ Webhook error:", topic, e);
           }
         }
 
