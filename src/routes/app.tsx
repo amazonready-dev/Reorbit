@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { shopifyIdToken } from "@shopify/app-bridge/utilities";
+
 import {
   AppProvider as PolarisProvider,
   Page,
@@ -13,26 +14,35 @@ import {
   InlineStack,
   Badge,
 } from "@shopify/polaris";
+
 import enTranslations from "@shopify/polaris/locales/en.json";
 import "@shopify/polaris/build/esm/styles.css";
+
 import { getAppConfig } from "@/lib/app-config.functions";
 
-export const Route = createFileRoute("/app")({
+export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
     shop: typeof search.shop === "string" ? search.shop : undefined,
     host: typeof search.host === "string" ? search.host : undefined,
     billing: typeof search.billing === "string" ? search.billing : undefined,
   }),
 
-  loaderDeps: ({ search }) => ({ shop: search.shop }),
+  loaderDeps: ({ search }) => ({
+    shop: search.shop,
+  }),
 
-  loader: ({ deps }) => getAppConfig({ data: { shop: deps.shop } }),
+  loader: ({ deps }) =>
+    getAppConfig({
+      data: { shop: deps.shop },
+    }),
 
   head: ({ loaderData }) => {
     const apiKey = loaderData?.apiKey ?? "";
 
     return {
-      meta: apiKey ? [{ name: "shopify-api-key", content: apiKey }] : [],
+      meta: apiKey
+        ? [{ name: "shopify-api-key", content: apiKey }]
+        : [],
       scripts: [
         {
           src: "https://cdn.shopify.com/shopifycloud/app-bridge.js",
@@ -44,21 +54,14 @@ export const Route = createFileRoute("/app")({
   component: EmbeddedApp,
 });
 
-declare global {
-  interface Window {
-    shopify?: {
-      idToken: () => Promise<string>;
-    };
-  }
-}
-
 function EmbeddedApp() {
   const { shop, host, billing } = Route.useSearch();
   const { apiKey, billingStatus, planName } = Route.useLoaderData();
 
   const [sessionTokenOk, setSessionTokenOk] = useState<boolean | null>(null);
 
-  const isEmbedded = Boolean(shop && host && apiKey);
+  // safer embedded detection
+  const isEmbedded = Boolean(shop || host || apiKey);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -147,8 +150,7 @@ function EmbeddedApp() {
                 </InlineStack>
 
                 <Text as="p" tone="subdued">
-                  Reorbit is connected to your store. We generate AI-powered
-                  post-purchase upsells automatically.
+                  Reorbit is connected to your store. We generate AI-powered post-purchase upsells automatically.
                 </Text>
 
                 {isEmbedded && sessionTokenOk !== null && (
@@ -173,22 +175,9 @@ function EmbeddedApp() {
                 </Text>
 
                 <InlineStack gap="300" wrap>
-                  <PlanButton
-                    shop={shop}
-                    plan="starter"
-                    label="Starter — $29/mo"
-                  />
-                  <PlanButton
-                    shop={shop}
-                    plan="growth"
-                    label="Growth — $79/mo"
-                    variant="primary"
-                  />
-                  <PlanButton
-                    shop={shop}
-                    plan="scale"
-                    label="Scale — $199/mo"
-                  />
+                  <PlanButton shop={shop} plan="starter" label="Starter — $29/mo" />
+                  <PlanButton shop={shop} plan="growth" label="Growth — $79/mo" variant="primary" />
+                  <PlanButton shop={shop} plan="scale" label="Scale — $199/mo" />
                 </InlineStack>
               </BlockStack>
             </Card>
