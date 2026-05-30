@@ -6,8 +6,13 @@ function isValidShopDomain(shop: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shop);
 }
 
+/**
+ * ✅ FIXED Shopify HMAC verification (correct RAW query usage)
+ */
 function verifyShopifyHmac(url: URL, secret: string): boolean {
-  const params = new URLSearchParams(url.searchParams);
+  const rawQuery = url.search; // 👈 IMPORTANT: RAW, not rebuilt
+
+  const params = new URLSearchParams(rawQuery);
 
   const hmac = params.get("hmac");
   if (!hmac) return false;
@@ -15,21 +20,22 @@ function verifyShopifyHmac(url: URL, secret: string): boolean {
   params.delete("hmac");
   params.delete("signature");
 
-  // Shopify requires exact sorted query string
-  const sorted = [...params.entries()]
+  const message = [...params.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
+    .map(([key, value]) => `${key}=${value}`)
     .join("&");
 
-  const computed = createHmac("sha256", secret).update(sorted).digest("hex");
+  const generatedHash = createHmac("sha256", secret)
+    .update(message)
+    .digest("hex");
 
-  // IMPORTANT FIX: compare hex properly (NOT utf8)
+  // ✅ proper binary compare
   const hmacBuffer = Buffer.from(hmac, "hex");
-  const computedBuffer = Buffer.from(computed, "hex");
+  const generatedBuffer = Buffer.from(generatedHash, "hex");
 
-  if (hmacBuffer.length !== computedBuffer.length) return false;
+  if (hmacBuffer.length !== generatedBuffer.length) return false;
 
-  return timingSafeEqual(hmacBuffer, computedBuffer);
+  return timingSafeEqual(hmacBuffer, generatedBuffer);
 }
 
 export const Route = createFileRoute("/auth/shopify/callback")({
@@ -53,7 +59,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           return new Response("Missing Shopify env vars", { status: 500 });
         }
 
-        // 1. HMAC verification
+        // 1. HMAC check
         if (!verifyShopifyHmac(url, apiSecret)) {
           return new Response("HMAC verification failed", { status: 401 });
         }
@@ -74,7 +80,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           .delete()
           .eq("state", state);
 
-        // 3. Exchange code for token
+        // 3. Exchange code for access token
         const tokenRes = await fetch(
           `https://${shop}/admin/oauth/access_token`,
           {
@@ -99,7 +105,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           scope: string;
         };
 
-        // 4. Fetch shop info (safe fallback)
+        // 4. Fetch shop info
         let shopInfo: any = {};
 
         try {
@@ -141,7 +147,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           return new Response("DB error", { status: 500 });
         }
 
-        // 6. Register webhooks (safe, idempotent)
+        // 6. Webhooks
         const webhookTopics = [
           { topic: "orders/create", path: "/api/public/webhooks/shopify/orders-create" },
           { topic: "app/uninstalled", path: "/api/public/webhooks/shopify/app-uninstalled" },
@@ -168,7 +174,7 @@ export const Route = createFileRoute("/auth/shopify/callback")({
           }
         }
 
-        // 7. Redirect to app
+        // 7. Redirect
         return new Response(null, {
           status: 302,
           headers: {
