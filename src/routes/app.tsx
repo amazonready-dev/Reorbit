@@ -20,7 +20,7 @@ import "@shopify/polaris/build/esm/styles.css";
 
 import { getAppConfig } from "@/lib/app-config.functions";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/app")({
   validateSearch: (search: Record<string, unknown>) => ({
     shop: typeof search.shop === "string" ? search.shop : undefined,
     host: typeof search.host === "string" ? search.host : undefined,
