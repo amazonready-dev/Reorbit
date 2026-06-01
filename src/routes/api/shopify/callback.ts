@@ -33,7 +33,7 @@ function verifyShopifyHmac(url: URL, secret: string): boolean {
   return timingSafeEqual(hmacBuffer, computedBuffer);
 }
 
-export const Route = createFileRoute("/auth/shopify/callback")({
+export const Route = createFileRoute("/api/shopify/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {

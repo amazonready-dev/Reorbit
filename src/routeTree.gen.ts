@@ -20,8 +20,8 @@ import { Route as BillingSubscribeRouteImport } from './routes/billing.subscribe
 import { Route as BillingCallbackRouteImport } from './routes/billing.callback'
 import { Route as LovableEmailSuppressionRouteImport } from './routes/lovable/email/suppression'
 import { Route as AuthShopifyInstallRouteImport } from './routes/auth.shopify.install'
-import { Route as AuthShopifyCallbackRouteImport } from './routes/auth.shopify.callback'
 import { Route as ApiShopifySessionPingRouteImport } from './routes/api/shopify/session-ping'
+import { Route as ApiShopifyCallbackRouteImport } from './routes/api/shopify/callback'
 import { Route as ApiPublicProcessPendingOrdersRouteImport } from './routes/api.public.process-pending-orders'
 import { Route as LovableEmailTransactionalSendRouteImport } from './routes/lovable/email/transactional/send'
 import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
@@ -87,14 +87,14 @@ const AuthShopifyInstallRoute = AuthShopifyInstallRouteImport.update({
   path: '/auth/shopify/install',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthShopifyCallbackRoute = AuthShopifyCallbackRouteImport.update({
-  id: '/auth/shopify/callback',
-  path: '/auth/shopify/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiShopifySessionPingRoute = ApiShopifySessionPingRouteImport.update({
   id: '/api/shopify/session-ping',
   path: '/api/shopify/session-ping',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiShopifyCallbackRoute = ApiShopifyCallbackRouteImport.update({
+  id: '/api/shopify/callback',
+  path: '/api/shopify/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicProcessPendingOrdersRoute =
@@ -161,8 +161,8 @@ export interface FileRoutesByFullPath {
   '/billing/subscribe': typeof BillingSubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/api/public/process-pending-orders': typeof ApiPublicProcessPendingOrdersRoute
+  '/api/shopify/callback': typeof ApiShopifyCallbackRoute
   '/api/shopify/session-ping': typeof ApiShopifySessionPingRoute
-  '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/auth/shopify/install': typeof AuthShopifyInstallRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -185,8 +185,8 @@ export interface FileRoutesByTo {
   '/billing/subscribe': typeof BillingSubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/api/public/process-pending-orders': typeof ApiPublicProcessPendingOrdersRoute
+  '/api/shopify/callback': typeof ApiShopifyCallbackRoute
   '/api/shopify/session-ping': typeof ApiShopifySessionPingRoute
-  '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/auth/shopify/install': typeof AuthShopifyInstallRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -210,8 +210,8 @@ export interface FileRoutesById {
   '/billing/subscribe': typeof BillingSubscribeRoute
   '/email/unsubscribe': typeof EmailUnsubscribeRoute
   '/api/public/process-pending-orders': typeof ApiPublicProcessPendingOrdersRoute
+  '/api/shopify/callback': typeof ApiShopifyCallbackRoute
   '/api/shopify/session-ping': typeof ApiShopifySessionPingRoute
-  '/auth/shopify/callback': typeof AuthShopifyCallbackRoute
   '/auth/shopify/install': typeof AuthShopifyInstallRoute
   '/lovable/email/suppression': typeof LovableEmailSuppressionRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
@@ -236,8 +236,8 @@ export interface FileRouteTypes {
     | '/billing/subscribe'
     | '/email/unsubscribe'
     | '/api/public/process-pending-orders'
+    | '/api/shopify/callback'
     | '/api/shopify/session-ping'
-    | '/auth/shopify/callback'
     | '/auth/shopify/install'
     | '/lovable/email/suppression'
     | '/lovable/email/auth/preview'
@@ -260,8 +260,8 @@ export interface FileRouteTypes {
     | '/billing/subscribe'
     | '/email/unsubscribe'
     | '/api/public/process-pending-orders'
+    | '/api/shopify/callback'
     | '/api/shopify/session-ping'
-    | '/auth/shopify/callback'
     | '/auth/shopify/install'
     | '/lovable/email/suppression'
     | '/lovable/email/auth/preview'
@@ -284,8 +284,8 @@ export interface FileRouteTypes {
     | '/billing/subscribe'
     | '/email/unsubscribe'
     | '/api/public/process-pending-orders'
+    | '/api/shopify/callback'
     | '/api/shopify/session-ping'
-    | '/auth/shopify/callback'
     | '/auth/shopify/install'
     | '/lovable/email/suppression'
     | '/lovable/email/auth/preview'
@@ -309,8 +309,8 @@ export interface RootRouteChildren {
   BillingSubscribeRoute: typeof BillingSubscribeRoute
   EmailUnsubscribeRoute: typeof EmailUnsubscribeRoute
   ApiPublicProcessPendingOrdersRoute: typeof ApiPublicProcessPendingOrdersRoute
+  ApiShopifyCallbackRoute: typeof ApiShopifyCallbackRoute
   ApiShopifySessionPingRoute: typeof ApiShopifySessionPingRoute
-  AuthShopifyCallbackRoute: typeof AuthShopifyCallbackRoute
   AuthShopifyInstallRoute: typeof AuthShopifyInstallRoute
   LovableEmailSuppressionRoute: typeof LovableEmailSuppressionRoute
   LovableEmailAuthPreviewRoute: typeof LovableEmailAuthPreviewRoute
@@ -402,18 +402,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthShopifyInstallRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/shopify/callback': {
-      id: '/auth/shopify/callback'
-      path: '/auth/shopify/callback'
-      fullPath: '/auth/shopify/callback'
-      preLoaderRoute: typeof AuthShopifyCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/shopify/session-ping': {
       id: '/api/shopify/session-ping'
       path: '/api/shopify/session-ping'
       fullPath: '/api/shopify/session-ping'
       preLoaderRoute: typeof ApiShopifySessionPingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/shopify/callback': {
+      id: '/api/shopify/callback'
+      path: '/api/shopify/callback'
+      fullPath: '/api/shopify/callback'
+      preLoaderRoute: typeof ApiShopifyCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/process-pending-orders': {
@@ -493,8 +493,8 @@ const rootRouteChildren: RootRouteChildren = {
   BillingSubscribeRoute: BillingSubscribeRoute,
   EmailUnsubscribeRoute: EmailUnsubscribeRoute,
   ApiPublicProcessPendingOrdersRoute: ApiPublicProcessPendingOrdersRoute,
+  ApiShopifyCallbackRoute: ApiShopifyCallbackRoute,
   ApiShopifySessionPingRoute: ApiShopifySessionPingRoute,
-  AuthShopifyCallbackRoute: AuthShopifyCallbackRoute,
   AuthShopifyInstallRoute: AuthShopifyInstallRoute,
   LovableEmailSuppressionRoute: LovableEmailSuppressionRoute,
   LovableEmailAuthPreviewRoute: LovableEmailAuthPreviewRoute,
